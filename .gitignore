@@ -1,3 +1,6 @@
 
 **/.DS_Store
 .DS_Store
+txt-extraction/napatswift-easyocr/input/**
+txt-extraction/napatswift-easyocr/output/**
+

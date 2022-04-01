@@ -38,13 +38,13 @@ def mode(lst):
   return max(set(lst), key=lst.count)
 
 def getBlock(blocks):
-  cBlock = []
-  AllBaseLine = []
+  cleanedBlocks = []
+  allNormalizedVertices = []
+
   for block in blocks:
     for paragraph in block['paragraphs']:
       for word in paragraph['words']:   
 
-        symbols = []
         text = []
         for symbol in word['symbols']:
           symbol.pop('confidence', None)
@@ -53,17 +53,17 @@ def getBlock(blocks):
             text.append(' ')
         
         vertices = word['boundingBox']['normalizedVertices']
-        baseLine = [(v['x'], v['y']) for v in vertices]
+        normalizedVertices = [(v['x'], v['y']) for v in vertices]
         
-        AllBaseLine.append(baseLine)
+        allNormalizedVertices.append(normalizedVertices)
         
-        cBlock.append({
-          'normalizedVertices': baseLine,
+        cleanedBlocks.append({
+          'normalizedVertices': normalizedVertices,
           # 'symbols': word['symbols'],
-          'baseLine': np.max(baseLine, axis=0).tolist(),
+          'baseLine': np.max(normalizedVertices, axis=0).tolist(),
           'text': ''.join(text)
         })
-  return cBlock, AllBaseLine
+  return cleanedBlocks, allNormalizedVertices
 
 def blocksInLine(dix, page, contained):
   line = []
@@ -74,12 +74,13 @@ def blocksInLine(dix, page, contained):
     line.append(page[ii])
     contained[ii] = True
 
-  line.sort(key=lambda b: np.max(b['normalizedVertices'], axis=0)[0].mean())
+  line.sort(key=lambda b: np.mean(b['normalizedVertices'], axis=0)[0].mean())
   text = [block['text'] for block in line]
 
   return {'blocks': line, 'text': ''.join(text)}
 
 def lineInPage(page, BaseLines):
+  # TODO: https://stackoverflow.com/a/48277234/15538794
   pageBaseLine = BaseLines[:, :, 1].mean(axis=1)
   contained = np.zeros(pageBaseLine.size, dtype=bool)
   lines = []
@@ -89,11 +90,13 @@ def lineInPage(page, BaseLines):
     if (contained[ii]): continue
     # calculate the line diff
     lineDiff = np.abs(pageBaseLine-pageBaseLine[ii])/pageBaseLine[ii]
-    # get index of boxes that has diff less than 2 percents
-    dix = np.argwhere(lineDiff < .02).reshape(-1)
+    # get index of boxes that has diff less than 3 percents
+    dix = np.argwhere(lineDiff <= .01).reshape(-1)
     blocks = blocksInLine(dix, page, contained)
     text += blocks['text']
     lines.append(blocks)
+
+  lines.sort(key=lambda line: np.mean([block['normalizedVertices'][2][1] for block in line['blocks']]))
   return {'lines': lines, 'text': text}
 
 def printPage(doc, pageNum):
